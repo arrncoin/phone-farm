@@ -1,0 +1,81 @@
+services:
+  web-control:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: farm-web-control
+    restart: unless-stopped
+    init: true
+    shm_size: 2gb
+    devices:
+      - /dev/kvm:/dev/kvm
+    group_add:
+      - "${KVM_GID:-108}"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      NODE_ENV: production
+      APP_PORT: 3000
+      AUTH_ENABLED: ${AUTH_ENABLED:-true}
+      DASHBOARD_PASSWORD: ${DASHBOARD_PASSWORD:?Set DASHBOARD_PASSWORD in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET in .env}
+      ANDROID_EMULATOR_ENABLED: "true"
+      ANDROID_DATA_DIR: /data/android-devices
+      ANDROID_SYSTEM_IMAGE: system-images;android-35;google_apis_playstore;x86_64
+      MAX_DEVICES: ${MAX_DEVICES:-10}
+      EMULATOR_MEMORY_MB: ${EMULATOR_MEMORY_MB:-2048}
+      EMULATOR_VCPUS: ${EMULATOR_VCPUS:-2}
+      EMULATOR_GPU_MODE: ${EMULATOR_GPU_MODE:-swiftshader}
+    volumes:
+      - android-device-data:/data/android-devices
+    networks:
+      - farm-net
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health').then(response => { if (!response.ok) process.exitCode = 1 }).catch(() => process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: farm-nginx
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - farm-net
+    depends_on:
+      web-control:
+        condition: service_healthy
+
+  ngrok-gateway:
+    image: ngrok/ngrok:3
+    container_name: farm-ngrok
+    restart: unless-stopped
+    profiles:
+      - remote
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTH_TOKEN:-}
+    command:
+      - http
+      - farm-nginx:80
+    networks:
+      - farm-net
+    depends_on:
+      - nginx
+
+volumes:
+  android-device-data:
+
+networks:
+  farm-net:
+    driver: bridge

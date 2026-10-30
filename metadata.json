@@ -1,0 +1,6 @@
+{
+  "name": "Android Phone Farm 10 — Web Control Center",
+  "description": "Multi-device Android virtualization control center with 10-device live streaming, synchronized touch & swipe controls, ADB bridge, Docker orchestration, and Ngrok remote access.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
